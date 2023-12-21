@@ -1,0 +1,364 @@
+---
+title: "Can British homeworkers have more stable work schedules? A time-use approach to measure work schedule instability"
+author: "Zhuofei Lu and Laurent Lesnard"
+format: docx
+editor: visual
+bibliography: references.bib
+---
+
+## 1. Introduction
+
+A growing body of literature recognises that 'work schedule instability' can lead to worse well-being status and a series of mental issues, including irregular health practises, mental distress, poor sleep quality, and unhappiness [@schneider2019; @ananat2020]. Although there is a rich research tradition investigating the consequences of work schedule instability for worker health and well-being [@carrillo2017; @harknett2020; @luhr2022], far too little attention has been paid to the predictors of work schedule instability. In addition, the definitions and measurements of work schedule instability in current literature are almost all based on respondents' irregular work arrangments controlled by employers (i.e., cancelled shifts or any schedule change experience) [@carrillo2017; @harknett2020] or working time patterns based on long-term memories (i.e., week-to-week hours variation in the past month) [@schneider2019] but not 24-hour daily time use data. The studies that use these 'work-domain-oriented' measurements tend to assume 'work schedule instability' are mainly caused by factors in the work domain but ignore the fact that workers also can control their work schedule to facilitate private/family demands, thereby increasing their work schedule instability [@chung2022; @cornwell2013]. In particular, during the last decades, flexible working arrangements have become common rights in the UK labour market, which allow workers to decide when and where to work flexibly [@lu2023]. Such changes led to numerous debates and studies aimed especially at predicting the impacts of working from home on time use patterns and time quality indexes related to work-life balance [@offer2011; @craig2016]. Therefore, it is necessary to find out an objective measure of work schedule instability based on workers' accurate time use data.
+
+      In this study, we expect that working from home can shape workers' work schedule instability by offering more work autonomy and flexibility, while such associations still subject to ongoing debates due to the lack of empirical evidence. On the one hand, according to the resource (drain) perspective in the work‐family spillover theory [@greenhaus1985; @frone1992], some scholars predict that workers tend to have more time and energy to manage their work schedule when working from home since they might have more work autonomy and flexibility to address work-family conflicts [@lu2023a; @li2022]. On the other hand, some sociologists of work are worrying about the potential adverse effects of working from home and emphasise the potential role-blurring effects [@yucel2021; @wheatley2012]. This is because workers might increase work schedule instability when working from home due to the blurring of the temporal and spatial boundaries between their work commitments and private life [@zerubavel1979; @clark2000]. Overall, there are conflicting theoretical predictions about the associations between working from home and work schedule instability. Owing to the limitation of time use data and methods used, no direct dialogue is available. Therefore, the study's first objective is to explore how working from home shape workers' work schedule instability by using 24-hour time use data to measure work schedule instability.
+
+       Moreover, given that workers' experience in the labour market and time use patterns are highly gendered and class-differentiated, we expect that the associations between working from home and work schedule instability might vary across gender, occupational class and the combination of the two. For men, workers in the higher (i.e., professional and managerial classes) groups and the lower (i.e., routine and manual classes) groups share different bargaining power and job demands and security, making them suffer different risks in terms of work schedule instability [@dumont2012; @warren2015; @bianchi2014]. For example, the higher occupational groups might exchange the right to work at home with their high bargaining power [@dumont2012], while the lower groups might passively work at home since they do not have other choices [@bathini2017]. As for women, other than class disparities in the labour market, female workers in different occupational classes suffer from different stress-related exposures and different degrees of worse time quality (i.e., time fragmentation and contaminated free time) in their households [@carrillo2017a; @craig2016], making them at different risk when working from home and dealing with work schedule instability. For instance, women in the lower occupational groups might share more household responsibilities and have fewer resources (i.e., money, time and energy) to manage work schedules [@hu2017; @syrda2022].
+
+       By achieving both objectives, this study tends to make two important contributions to the literature. First, we empirically extend the previous research by developing an objective measure of work schedule instability by using workers' 24-hour time use data. Specifically, in the UK time use survey 2020-2021, respondents were asked to record every single working episode (10 minutes/1 episode) within 24 hours. Thus, we are able to identify 'hamming distance' to measure similarities between sequences [@lesnard2010]. (Here we need more introduction about hamming distance). See Table \[X\] for more details about the measurement of hamming distance. Second, the study provides novel insights into the debate about whether and how working from home shapes workers' work schedule instability across gender and occupational class.
+
+## 2. Literature review
+
+## 3. Analysis
+
+The sample of this study is drawn from the Centre for Time Use Research (CTUR) UK Time Use Survey across the COVID-19 pandemic. The dataset is a population-representative (quota sample) time-use diary data collected by the Centre for Time Use Research through an online Click and Drag Diary Instrument (CaDDI). Representative quotas were established for the gender, age group, region, and social class distribution of the population. As part of the survey, respondents were given online time-use diaries, and were asked to record what they were doing, how they were doing it, and their feelings towards their activities during 144 10-minute episodes across the day [@sullivan2021]. In addition to the diaries, the dataset contains information about standard socio-demographic variables and mental health. Respondents completed the online time-use diaries for between 1 and 3 days, yielding diary data for around 5800 diary days across 2020-2021. The sample first excluded those who were not in paid employment. Then, we selected those who reported at least two work diary days as the target sample (X%). After excluding the samples with missing data (around X%) or extreme values such as 0 or 24 working hours per day (around X%), The final analytic sample came to include X adult workers who have at least two 24-hour working day diaries. More details about the sample can be seen in Table X.
+
+**Data cleaning (using stata)**
+
+**Note:** I can change it to R code later
+
+``` stata
+//6896 observations in total
+use "uk_6_wave_caddi.dta",replace
+//keep wave2 - 6
+drop if survey==1
+//(1,011 observations deleted)
+//left 5885 observations
+save "uk_5_wave_caddi.dta",replace
+ 
+//keep people who are in working status (Employment situation now)
+keep if emplnow<5
+keep if emplnow>0
+keep if econstat==3
+//3051 left
+
+//generate a new variable: working from home(2) or not(1)
+g wfh=emplnow
+recode wfh 1/2=1 3/4=2
+//1896 changes made to wfh
+
+//keep work days, drop weekend data
+drop if dday==6
+//509 observations deleted
+drop if dday==7
+//2059 left
+save "5wave-cleaned.dta" ,replace
+
+//g work
+foreach var of varlist pri1-pri144 {
+egen w_`var' = anymatch(`var'),v(117)
+}
+
+egen paidwork=rowtotal(w_pri*)
+
+//housework
+foreach var of varlist pri1-pri144 {
+egen h_`var' = anymatch(`var'),v(105,106,107,108,121,122,123,124,126)
+}
+
+//Free time-leisure actrivities
+foreach var of varlist pri1-pri144 {
+egen f_`var' = anymatch(`var'),v(102,111,112,113,114,115,116,125,127,128,129,130,131,132,133,135,136)
+}
+
+//Personal care
+foreach var of varlist pri1-pri144 {
+egen p_`var' = anymatch(`var'),v(101,103,104,109,110)
+}
+
+//recode class into two categories
+g class=dclasuk
+drop if class>3 
+//34 observations deleted
+recode class 1=1 2=2 3=2
+
+//Monthly personal income from paid work
+g income=labin2
+replace income=. if income<0
+//94 to missing
+
+//Annual household income from any source
+g hincome=hhincom2
+replace hincome=. if hhincom2<0
+//69 to missing
+recode hincome 1=1 2/3=2 4/5=3 6/7=4 8/9=5 10=6 11=7
+
+//presense of children in household
+g pchild=nkids
+recode pchild 0=0 1/5=1
+
+//how you were working before the 'lockdown'?
+g wfh_b=empbfore
+recode wfh_b 1/2=1 3/4=2 5/9=3 98=3
+
+//Whether diary day was typical
+keep if typical==1
+//296 observations deleted
+//1763 left
+save "3days_cleaned0928.dta" ,replace
+
+egen pidp = group( mainid diaryord)
+order pidp
+sort pidp
+save "3days_cleaned0928.dta" ,replace
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading required package: pacman
+
+```{r}
+if (!require("pacman")){
+  install.packages("pacman")
+  library(pacman)
+}
+```
+
+## load and install packages
+
+```{r libraries}
+pacman::p_load(TraMineR, TraMineRextras, cluster, RColorBrewer, devtools, haven, 
+               tidyverse, reshape2, WeightedCluster, nnet, data.table, Statamarkdown, AER)
+```
+
+## Load .dta (Stata) Dataset
+
+```{r}
+# setwd("E:/OneDrive/SciencesPo/data")
+## LL: you should create a R project using this directory instead of setting manually your working directory
+## it makes your code stronger and independent of personal configurations
+x3 <- read_dta("3days_cleaned0928.dta")
+## I would also suggest not to use capital letters for R objects as it makes the code a little bit more difficult to write
+## and if you use only lower cases as a rule, it makes R code safer from case errors
+```
+
+## Color Palette
+
+```{r}
+colourCount = 13
+getPalette = colorRampPalette(brewer.pal(9, "Set3"))
+```
+
+```{r}
+############################### [Updated on 11/10/2023] intra-individual measure of schedule instability (using 2 diary days) 
+
+dat <- tibble(id = c(1,1,2,2),
+              x1 = c(0,1,1,1),
+              x2 = c(0,1,1,1),
+              x3 = c(0,1, 0, 1))
+# with dplyr
+
+dat %>%
+  group_by(id) %>%
+  summarise(d = dist(data.frame(x1, x2, x3), method = "manhattan"))
+
+# with data.table
+
+setDT(dat)
+dat[ , .(d = dist(.SD, method = "manhattan")), by = id, .SD = x1:x3]
+
+
+############################### [Updated on 17/10/2023] intra-individual measure of schedule instability (using 3 diary days)
+## Example for practise
+library(data.table)
+library(tibble)
+
+dat <- tibble(id = c(1,1,1,2,2,2),
+              x1 = c(0,1,0,0,1,1),
+              x2 = c(1,1,0,1,1,1),
+              x3 = c(0,1,0,1,0,1))
+setDT(dat)
+
+# use data.table to estimate manhattan distance
+distances_df <- dat[, .(distance = dist(.SD, method = "manhattan")), by = id, .SDcols = x1:x3]
+
+# print manhattan distance
+print(distances_df)
+
+# use data.table  to estimate mean and variance
+summary_stats <- distances_df[, .(mean_distance = mean(distance), variance = var(distance)), by = id]
+
+# print mean and variance
+print(summary_stats)
+
+
+############################### [Updated on 23/10/2023] Use UKTUS for practise 
+```
+
+## Read data UKTUS 3days cleaned
+
+## Keep those who have at least 2 diary days (new subset: d2)
+
+At this stage, we drop (1763-1164=599) cases
+
+```{r}
+x3 <- x3 %>%
+  group_by(mainid) %>%
+  mutate(ndays = n())
+d2 <- x3  %>%
+  filter(ndays >= 2)
+head(d2$mainid)
+```
+
+## Calculate the manhattan distance
+
+```{r}
+setDT(d2)
+
+distances_df <- d2[, .(distance = dist(.SD, method = "manhattan")), by = mainid, .SDcols = w_pri1:w_pri144]
+print(distances_df)
+
+mean_distances <- distances_df[, .(mean_distance = mean(distance)), by = mainid]
+
+d2 <- d2 %>% 
+  left_join(mean_distances, by = "mainid")
+
+summary(d2$mean_distance)
+```
+
+## Slice the sample, keep only one observation for each respondent
+
+At this stage, we drop (599-568=31) cases
+
+```{r}
+# d2 <- read_dta("d2.dta")
+# Am I right to assume that you exported the above d2 file to stata? It does not appear in the syntax file as it should be : this document must be autonomous
+
+d3 <- d2 %>%
+  group_by(mainid) %>%
+  slice_sample(n = 1)
+
+print(d3)
+```
+
+## Drop cases who were not in paid employment
+
+At this stage, we drop (568-567=1) cases
+
+```{r}
+d3 <- d3[d3$headocc3 != 4, ]
+```
+
+## Predict schedule instability
+
+## Discriptive statistics
+
+```{r pressure, echo=FALSE}
+
+d3$headocc3 <- as.factor(as.character(d3$headocc3))
+d3$wfh <- factor(d3$wfh, levels = c(1, 2), labels = c("Travel to Work", "Work from Home"))
+# What is wfh?
+
+d3_summary <- d3 %>%
+  group_by(headocc3, wfh) %>%
+  summarise(mean_distance = mean(mean_distance, na.rm = TRUE))
+
+
+p <- ggplot(d3_summary, aes(x=headocc3, y=mean_distance, fill=wfh)) + 
+  geom_bar(stat="identity", position="dodge") +
+  labs(y="Mean of mean_distance", x="Headocc3 Categories") +
+  theme_minimal() +
+  scale_fill_manual(name="Work Mode", 
+                    values = c("Travel to Work" = "grey40", "Work from Home" = "grey80")) +
+  scale_x_discrete(labels=c("1"="High", "2"="Intermediate", "3"="Routine"))
+
+print(p)
+write_dta(d3, path = "d3.dta")
+```
+
+## Regression OLS
+
+```{stata, collectcode = TRUE}
+use d3.dta
+*codebook, compact
+svyset [pweight = daywtq]
+svy: reg mean_distance i.wfh i.headocc3 i.sex i.child i.health i.marstat age labin2
+```
+
+The two chunks below do not work, I turned off their evaluation
+
+```{r, eval = F}
+model1 <- lm(mean_distance ~ factor(wfh)+ factor(headocc3) + factor(sex)+ factor(child)+ factor(health)+ factor(marstat) + age  + labin2
+             , data=d3, weight=daywtq)
+summary(model1)
+```
+
+## Moderating role of class
+
+```{r, eval = F}
+model2 <- lm(mean_distance ~ factor(wfh)*factor(headocc3) + factor(sex)+ factor(child)+ factor(health)+ factor(marstat) + age  + labin2
+             , data=d3, weight=daywtq)
+summary(model2)
+```
+
+## Plot the interaction
+
+```{r}
+all_combinations <- expand.grid(
+  wfh = unique(d3$wfh),
+  headocc3 = unique(d3$headocc3),
+  sex = unique(d3$sex),
+  child = unique(d3$child),
+  health = unique(d3$health),
+  marstat = unique(d3$marstat),
+  age = median(d3$age, na.rm = TRUE), 
+  labin2 = median(d3$labin2, na.rm = TRUE)
+)
+```
+
+## Predict interaction terms using the model results
+
+```{r, eval = F}
+all_combinations$predicted <- predict(model2, all_combinations)
+
+```
+
+## Plot
+
+```{r, eval = F}
+p1<- ggplot(all_combinations, aes(x=factor(wfh), y=predicted, group=factor(headocc3), color=factor(headocc3))) + 
+  geom_line(aes(linetype=factor(headocc3))) + 
+  geom_point(aes(shape=factor(headocc3))) + 
+  labs(y="Predicted mean_distance", x="WFH", color="Headocc3 Levels", linetype="Headocc3 Levels", shape="Headocc3 Levels") +
+  theme_minimal()
+
+print(p1)
+```
+
+## Repeat by using Tobit
+
+```{r, eval = F}
+model_tobit1 <- tobit(mean_distance ~ factor(wfh) + factor(headocc3) + factor(sex) + factor(child) + factor(health) + factor(marstat) + age + labin2, 
+                     data = d3, weights = daywtq, left=0) 
+
+summary(model_tobit1)
+
+## Interaction
+
+model_tobit2 <- tobit(mean_distance ~ factor(wfh)*factor(headocc3) + factor(sex) + factor(child) + factor(health) + factor(marstat) + age + labin2, 
+                     data = d3, weights = daywtq, left=0) 
+
+summary(model_tobit2)
+
+```
+
+# Here we go
+
+setDT(x3)
+
+instability \<- x3\[ , .(d = dist(.SD, method = "manhattan")), by = mainid, .SD = pri1:pri144\]\[ , .(insta = mean(d)), by = mainid\]
+
+hist(instability\$insta)
+
+\`\`\`
