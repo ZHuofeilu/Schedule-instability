@@ -1,0 +1,220 @@
+---
+title: "Schedule instability (code)"
+format: html
+editor: visual
+---
+
+## 
+
+**Data cleaning (using stata)**
+
+``` stata
+
+// cd ./YOUR TARGET WORKING DIRECTORY
+
+
+use uk_6_wave_caddi,replace
+drop if survey == 1
+save uk_5_wave_caddi, replace
+
+use uk_5_wave_caddi
+keep if emplnow < 5
+keep if emplnow > 0
+g work_from_home = emplnow
+recode work_from_home 1/2 = 1 3/4 = 2
+g class=dclasuk
+drop if class>3
+drop if econstat==9
+g child = nkids
+recode child 0 = 0 1/5 = 1
+gen weekend = 1
+replace weekend = 2 if dday > 5 
+replace marstat = . if marstat <0 
+
+keep if typical==1
+egen pidp = group( mainid diaryord)
+order pidp
+sort pidp
+save 5_wave_cleaned, replace
+
+
+use 5_wave_cleaned
+
+
+//g Work
+foreach var of varlist pri1-pri144 {
+egen w_`var' = anymatch(`var'),v(117)
+}
+
+//Housework
+foreach var of varlist pri1-pri144 {
+egen h_`var' = anymatch(`var'),v(105,106,107,108,121,122,123,124,126)
+}
+
+//Free time-leisure actrivities
+foreach var of varlist pri1-pri144 {
+egen f_`var' = anymatch(`var'),v(102,111,112,113,114,115,116,125,127,128,129,130,131,132,133,135,136)
+}
+
+//Personal care
+foreach var of varlist pri1-pri144 {
+egen p_`var' = anymatch(`var'),v(101,103,104,109,110)
+}
+
+//Sleep
+foreach var of varlist pri1-pri144 {
+egen s_`var' = anymatch(`var'),v(101)
+}
+
+save 3days_cleaned, replace
+
+//Frag 
+use 3days_cleaned
+keep pidp w_pri1-w_pri144
+reshape long  w_pri,i(pidp) j(time)
+g b=w_pri
+xtset pidp time
+gen lag=l.b
+g c=b-lag
+g f=c
+keep pidp time f
+reshape wide f,i(pidp)j(time)
+egen frag_start=rcount( f1-f144 ), c(@==1)
+egen frag_end=rcount( f1-f144 ), c(@==-1)
+
+save frag_covid, replace
+
+clear
+use 3days_cleaned
+merge 1:m pidp using "frag_covid"
+keep if _merge == 3
+drop _merge
+
+drop if frag_start==0
+
+egen unpaid_1 = rowtotal(h_pri*)
+egen paid_1 = rowtotal(w_pri*)
+egen personal_1 = rowtotal(p_pri*)
+egen sleep = rowtotal(s_pri*)
+foreach var of varlist pidp-sleep {
+replace `var' = . if `var' <0 
+}
+
+save 3days_cleaned, replace
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading required package: pacman
+
+```{r}
+if (!require("pacman"))
+  { install.packages("pacman")   
+  library(pacman) }
+```
+
+## load and install packages
+
+```{r libraries}
+pacman::p_load(TraMineR, TraMineRextras, cluster, RColorBrewer, devtools, haven,                 tidyverse, reshape2, WeightedCluster, nnet, data.table, Statamarkdown, AER)
+```
+
+## Load .dta (Stata) Dataset
+
+N=1808
+
+```{r}
+x3 <- read_dta("3days_cleaned.dta")
+```
+
+```{r}
+x3 <- read_dta("3days_cleaned(weekday).dta")
+##if exclude weekend diaryies, run this line
+```
+
+## Read data UKTUS 3days cleaned
+
+## Keep those who have at least 2 diary days (new subset: d2)
+
+With weekend: At this stage, we drop (2905-2368=537) cases
+
+Without weekend: At this stage, we drop (2018-1325=653) cases
+
+```{r}
+x3 <- x3 %>%
+  group_by(mainid) %>%
+  mutate(ndays = n())
+d2 <- x3  %>%
+  filter(ndays >= 2)
+head(d2$mainid)
+```
+
+## Calculate the manhattan distance
+
+```{r}
+setDT(d2)
+
+distances_df <- d2[, .(distance = dist(.SD, method = "manhattan")), by = mainid, .SDcols = w_pri1:w_pri144]
+print(distances_df)
+
+mean_distances <- distances_df[, .(mean_distance = mean(distance)), by = mainid]
+
+d2 <- d2 %>% 
+  left_join(mean_distances, by = "mainid")
+
+summary(d2$mean_distance)
+```
+
+**Average fragmentation**
+
+```{r}
+average <- d2 %>%
+  group_by(mainid) %>%
+  summarise(av_frag_start = mean(frag_start, na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(average, by = "mainid")
+
+```
+
+**Average pressure**
+
+```{r}
+average_pressure <- d2 %>%
+  group_by(mainid) %>%
+  summarise(av_pressure = mean(pressure, na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(average_pressure, by = "mainid")
+```
+
+## Slice the sample, keep only one observation for each respondent
+
+**With weekend diaries:** At this stage, we drop (2368-969=1399) cases
+
+**Without weekend diaries:** At this stage, we drop (1325-647=678) cases
+
+```{r}
+# d2 <- read_dta("d2.dta")
+# Am I right to assume that you exported the above d2 file to stata? It does not appear in the syntax file as it should be : this document must be autonomous
+
+d3 <- d2 %>%
+  group_by(mainid) %>%
+  slice_sample(n = 1)
+
+print(d3)
+```
+
+## Predict schedule instability
+
+```{r}
+write_dta(d3, "schedule_analysis(weekend).dta")
+
+```
+
+```{r}
+write_dta(d3, "schedule_analysis(weekday).dta")
+##only weekday
+```
