@@ -123,8 +123,6 @@ pacman::p_load(TraMineR, TraMineRextras, cluster, RColorBrewer, devtools, haven,
 
 ## Load .dta (Stata) Dataset
 
-N=1808
-
 ```{r}
 x3 <- read_dta("3days_cleaned.dta")
 ```
@@ -167,16 +165,42 @@ d2 <- d2 %>%
 summary(d2$mean_distance)
 ```
 
+**Sleep**
+
+```{r}
+setDT(d2)
+
+distances_df_s <- d2[, .(distance_s = dist(.SD, method = "manhattan")), by = mainid, .SDcols = s_pri1:s_pri144]
+print(distances_df_s)
+
+mean_distances_s <- distances_df_s[, .(mean_distance_s = mean(distance_s)), by = mainid]
+
+d2 <- d2 %>% 
+  left_join(mean_distances_s, by = "mainid")
+
+summary(d2$mean_distance_s)
+```
+
 **Average fragmentation**
 
 ```{r}
 average <- d2 %>%
+  filter(frag_start != 0) %>%
   group_by(mainid) %>%
   summarise(av_frag_start = mean(frag_start, na.rm = TRUE))
 
 d2 <- d2 %>%
   left_join(average, by = "mainid")
+```
 
+```{r}
+variance2 <- d2 %>%
+  filter(frag_start != 0) %>%
+  group_by(mainid) %>%
+  summarise(va_frag_start = var(frag_start, na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(variance2, by = "mainid")
 ```
 
 **Average pressure**
@@ -188,6 +212,46 @@ average_pressure <- d2 %>%
 
 d2 <- d2 %>%
   left_join(average_pressure, by = "mainid")
+```
+
+```{r}
+variance <- d2 %>%
+  group_by(mainid) %>%
+  summarise(hours_variance = var(paid_1, na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(variance, by = "mainid")
+
+```
+
+```{r}
+diff_hour <- d2 %>%
+  arrange(mainid, diaryord) %>%
+  group_by(mainid) %>%
+  summarise(mean_work_hours_diff = mean(combn(paid_1, 2, function(x) abs(x[1] - x[2])), na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(diff_hour, by = "mainid")
+```
+
+**Enjoyment**
+
+```{r}
+average_work_enj <- d2 %>%
+  group_by(mainid) %>%
+  summarise(av_w_enj = mean(work_enj, na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(average_work_enj, by = "mainid")
+```
+
+```{r}
+average_nonwork_enj <- d2 %>%
+  group_by(mainid) %>%
+  summarise(av_nw_enj = mean(nonwork_enj, na.rm = TRUE))
+
+d2 <- d2 %>%
+  left_join(average_nonwork_enj, by = "mainid")
 ```
 
 ## Slice the sample, keep only one observation for each respondent

@@ -142,17 +142,14 @@ replace workplace=1 if workplace_i==0 //Non Workplace
 replace workplace=2 if nonworkplace_time==0 //On Site
 replace workplace=3 if workplace==. //Mix
 
-
-
 sort mainid
-by mainid: egen min_workplace = min(workplace)
-by mainid: egen max_workplace = max(workplace)
-gen change_workplace = min_workplace != max_workplace
-
+by mainid: egen mean_workplace = mean(workplace)
 gen location = .
-replace location = 1 if change_workplace == 0 & min_workplace == 1
-replace location = 2 if change_workplace == 0 & min_workplace == 2
-replace location = 3 if change_workplace == 1
+replace location = 1 if mean_workplace == 1
+replace location = 2 if mean_workplace == 2
+replace location = 3 if location ==.
+
+
 //new_var 为 1（non workplace）
 //new_var 为 2（workplace）
 //new_var 为 3（mix）
@@ -163,3 +160,8 @@ save 3days_cleaned, replace
 //
 drop if dday >5
 save "3days_cleaned(weekday)", replace
+
+
+//
+drop if frag_start==0
+save "3days_cleaned(frag)", replace
