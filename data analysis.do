@@ -1,3 +1,8 @@
+label define location_label 1 "Always Home" 2 "Always Office" 3 "Always Mix" 4 "Home+Office" 5 "Mix" 
+
+label values location location_label
+
+
 
 g work_from_home2=empbfore
 recode work_from_home2 1/2=1 3/4=2 5/max=.
