@@ -118,7 +118,7 @@ if (!require("pacman"))
 ## load and install packages
 
 ```{r libraries}
-pacman::p_load(TraMineR, TraMineRextras, cluster, RColorBrewer, devtools, haven,                 tidyverse, reshape2, WeightedCluster, nnet, data.table, Statamarkdown, AER)
+pacman::p_load(TraMineR, TraMineRextras, cluster, RColorBrewer, devtools, haven,                 tidyverse, reshape2, WeightedCluster, nnet, data.table, Statamarkdown, AER, matrixStats)
 ```
 
 ## Load .dta (Stata) Dataset
@@ -128,6 +128,8 @@ x3 <- read_dta("3days_cleaned.dta")
 ```
 
 ```{r}
+#| eval: FALSE
+
 x3 <- read_dta("3days_cleaned(weekday).dta")
 ##if exclude weekend diaryies, run this line
 ```
@@ -279,6 +281,197 @@ write_dta(d3, "schedule_analysis(weekend).dta")
 ```
 
 ```{r}
+#| eval: FALSE
+
 write_dta(d3, "schedule_analysis(weekday).dta")
 ##only weekday
+```
+
+We do the sequence analysis of the workdays:
+- we define a sequence object
+- we apply the DHD to it
+- then we do an hybrid clustering:
+  - a partition using K-medoids with 20 medoids
+  - then a hierarchical clustering of the 20 medoids (using the flexible ß link)
+- the hclus gives hints on how to reduce the number of clusters
+- but ultimately, this will be our decision
+- this decision will be informed by the plots of the sequences grouped by medoids
+- and by some simple descriptive statistiques (start and end of the workday, duration)
+
+```{r}
+#| label: seqanalysis
+
+# we ungroup x3 and rename it dat
+dat <- ungroup(x3)
+
+# we keep only ids, days and weights
+
+workseq <- dat[, c("pidp", "daywtq", grep("w_pri", names(x3), value = T))]
+
+# we keep only sequences with at least 10 minutes of work
+workseq <- workseq[
+rowSums(workseq[, grep("w_pri", names(workseq))]) > 0,
+]
+
+slots <- grep("w_pri", names(workseq), value = T)
+
+# a trick for generating the labels 10 minutes by 10 minutes
+tslots <- tslots <- format(seq.POSIXt(ISOdate(year = 2019, month = 4, day = 8, hour = 4, min = 0), ISOdate(year = 2019, month = 4, day = 9, hour = 3, min =59 ), by = "10 min"),"%H:%M", tz="GMT")
+
+# we define the object sequence
+
+wseq <- seqdef(
+  workseq,
+  var = slots,
+  cnames = tslots,
+  alphabet = c("1", "0"),
+  cpal = c("grey", "white"),
+  labels = c("Work", "No work"),
+  xtstep = 1, 
+  id = workseq$pidp,
+  weights = workseq$daywtq
+)
+
+# Average work day
+seqdplot(wseq, border = NA)
+
+# sequence analysis
+workdist <- seqdist(wseq, method = "DHD", full.matrix = F)
+
+# K-medoids
+
+workmed <- wcKMedoids(
+  workdist,
+  k = 20, 
+  weights = workseq$daywtq
+)
+
+workmed_id <- sort(unique(workmed$clustering))
+
+# saving 
+
+workseq$clus20 <- factor(workmed$clustering, levels = workmed_id, labels = 1:20)
+
+# the above two lines are tricks to plot medoids ten by ten
+
+clust_1_10 <- factor(workmed$clustering, levels = workmed_id[1:10], labels = 1:10)
+clust_11_20 <- factor(workmed$clustering, levels = workmed_id[11:20], labels = 11:20)
+
+
+seqdplot(wseq, 
+         group = clust_1_10, 
+         border = NA, 
+         use.layout=TRUE, cols=3)
+pdf(file = "figures/clust_1_10.pdf", width = 11.69, height = 8.27)
+seqdplot(wseq, 
+         group = clust_1_10, 
+         border = NA, 
+         use.layout=TRUE, cols=3)
+dev.off()
+
+seqdplot(wseq, 
+         group = clust_11_20, 
+         border = NA, 
+         use.layout=TRUE, cols=3)
+pdf(file = "figures/clust_11_20.pdf", width = 11.69, height = 8.27)
+seqdplot(wseq, 
+         group = clust_11_20, 
+         border = NA, 
+         use.layout=TRUE, cols=3)
+dev.off()
+
+# distance between medoids
+# we need to define a function to extract it from the distance matrix
+
+dij <- function(i, j, n){
+  return(n * (i - 1) - i * (i - 1)/2 + j - i)
+}
+
+n <- dim(workseq)[1]
+nmed <- 20
+# Example position in the vector-distance of the first two medoids
+
+dij(
+  workmed_id[1],
+  workmed_id[2],
+  n
+)
+
+rdistmed <- rep(NA, nmed*(nmed - 1)/2)
+
+for (i in 1:(nmed - 1)){
+  for (j in (i + 1):nmed){
+    rdistmed[dij(i, j, nmed)] <- workdist[dij(workmed_id[i], workmed_id[j], n)]
+  }
+}
+
+rdistmed <- as.numeric(rdistmed)
+
+# we turn the vector into a "R matrix"
+attr(rdistmed,"Size") <- nmed
+class(rdistmed) <- "dist"
+attr(rdistmed,"Diag") <- FALSE
+attr(rdistmed,"Upper") <- FALSE
+
+# now when we print rdistmed, it appears as an lower distance matrix
+# but under the hood it's a vector…
+rdistmed
+
+
+clus <- agnes(rdistmed, diss = TRUE, method = "flexible", par.method = 0.65)
+
+plot(clus, which.plots = 2)
+pdf(file = "figures/dendrogram.pdf", width = 11.69, height = 8.27)
+plot(clus, which.plots = 2)
+dev.off()
+
+# descriptive statistics
+
+# duration
+workseq$duration <- rowSums(workseq[, grep("w_pri", names(workseq))])
+
+# start of the workday
+setDT(workseq)
+workseq$start_time <- 0
+
+for (i in 1:144){
+  workseq[start_time == 0 & workseq[[paste0("w_pri", i) ]] == 1, "start_time"] <- i
+}
+
+# end of the workday
+
+workseq$end_time <- 0
+
+for (i in 144:1){
+  workseq[end_time == 0 & workseq[[paste0("w_pri", i)]] == 1, "end_time"] <- i
+}
+
+# these times need to be shifted to take into account the fact that 
+# diaries were filled in between 4:00 am and 4:00 am the next day
+
+translate4 <- function(x){
+  x <- x + 24
+  x[x > 143] <- x[x > 143] - 144
+  x/6
+#  if (x <= 143) {
+#    res <- x/6
+#  } else {
+#    res <- (x - 144)/6
+#  }
+#  res
+}
+
+workseq[, `:=`(duration = duration/6, start_time = translate4(start_time), end_time = translate4(end_time))]
+
+statdes <- workseq[
+, 
+.(
+  N = .N,
+  duration = round(weighted.mean(duration, daywtq), digits = 2),
+  med_start_time = round(weightedMedian(start_time, daywtq), digits = 2),
+  med_end_time = round(weightedMedian(end_time, daywtq), digits = 2)
+),
+by = clus20
+][order(clus20)]
+statdes
 ```
